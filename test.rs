@@ -147,8 +147,8 @@ fn match_multi_condition_fn() {
 
     let colour = Colour::Black;
     match colour {
-        // Black => 1,
-        Black | Blue | Orange => 2,
+        Black => 1,
+        Blue | Orange => 2,
     }
 }
 

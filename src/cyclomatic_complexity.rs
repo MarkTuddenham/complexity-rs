@@ -37,12 +37,22 @@ fn cyclomatic_complexity(node: &Node, language: Language, source_code: &str) -> 
     // therefore cyclomatic complexity is number of match arm variables - 1
     // since one arm is effectively an "else"
     // For non-exhaustive enums the complexity is just the number of match arms.
-    decision_points += get_matches(node, language, source_code)
+    let matches = get_matches(node, language, source_code);
+    matches
+        .iter()
+        .for_each(|matched| trace_node(&matched.node, "match", source_code));
+
+    decision_points += matches
         .iter()
         .map(|mr| {
             mr.arms
                 .iter()
-                .map(|arm| count_match_arm_condition_variables(arm, language, source_code))
+                .map(|arm| {
+                    let n_conditions =
+                        count_match_arm_condition_variables(arm, language, source_code);
+                    trace_node(arm, &format!("match_arm({n_conditions})"), source_code);
+                    n_conditions
+                })
                 .sum::<usize>()
                 - 1
         })
