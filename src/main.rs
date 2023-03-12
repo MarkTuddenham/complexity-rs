@@ -1,14 +1,17 @@
 mod cli;
-mod languages;
-mod extractors;
 mod cyclomatic_complexity;
-mod watch;
+mod extractors;
+mod languages;
 mod utils;
+mod watch;
+
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use tracing_subscriber::{filter::LevelFilter, fmt, prelude::*, Registry};
 
+use crate::cyclomatic_complexity::cyclomatic_complexity;
 use crate::languages::get_language;
-use crate::cyclomatic_complexity::parse;
 use crate::utils::get_ts_parser;
 
 fn main() {
@@ -29,32 +32,51 @@ fn main() {
 
     let subscriber = Registry::default().with(file_logger).with(stdout_logger);
 
-    tracing::subscriber::set_global_default(subscriber).expect("unable to set global tracing subscriber");
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("unable to set global tracing subscriber");
 
     if let Err(e) = app(&args) {
         tracing::error!("{e}");
     }
 }
 fn app(args: &cli::CliArgs) -> anyhow::Result<()> {
-
     let language = get_language("rust").unwrap();
     let mut parser = get_ts_parser(language);
-
     if args.watch {
         watch::watch(&args.file_path, |paths| {
             paths
                 .iter()
-                .for_each(|path| parse(path, &mut parser, language));
+                .for_each(|path| cyclomatic_complexity(path, &mut parser, language));
         })
         .unwrap();
 
         loop {
             std::thread::sleep(std::time::Duration::from_millis(1000));
         }
+    } else if args.file_path.is_dir() {
+        let mut paths = get_recursed_file_paths(&args.file_path)?;
+        paths.sort();
+        paths
+            .iter()
+            .for_each(|path| cyclomatic_complexity(path, &mut parser, language));
     } else {
-        //TODO: better handle folders
-        parse(&args.file_path, &mut parser, language);
+        cyclomatic_complexity(&args.file_path, &mut parser, language);
     }
 
     Ok(())
+}
+
+fn get_recursed_file_paths(path: impl AsRef<Path>) -> std::io::Result<Vec<PathBuf>> {
+    let path = path.as_ref();
+    let mut paths = vec![];
+    if path.is_dir() {
+        for entry in fs::read_dir(path)? {
+            paths.extend(get_recursed_file_paths(&entry?.path())?);
+        }
+    } else {
+        //FIXME: only get rust files
+        paths.push(path.to_path_buf());
+    }
+
+    Ok(paths)
 }

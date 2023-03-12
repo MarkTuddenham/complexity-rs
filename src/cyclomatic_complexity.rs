@@ -10,8 +10,9 @@ use crate::extractors::{
 };
 use crate::utils::trace_node;
 
-pub fn parse(path: impl AsRef<Path>, parser: &mut Parser, language: Language) {
-    let source_code = fs::read_to_string(path.as_ref()).unwrap();
+pub fn cyclomatic_complexity(path: impl AsRef<Path>, parser: &mut Parser, language: Language) {
+    let path = path.as_ref();
+    let source_code = fs::read_to_string(path).unwrap();
     let tree = parser.parse(&source_code, None).unwrap();
 
     let root_node = tree.root_node();
@@ -19,12 +20,12 @@ pub fn parse(path: impl AsRef<Path>, parser: &mut Parser, language: Language) {
 
     functions.iter().for_each(|(fn_name, fn_node)| {
         trace_node(fn_node, fn_name, &source_code);
-        let cc = cyclomatic_complexity(fn_node, language, &source_code);
-        tracing::info!("{fn_name} - {cc}");
+        let cc = count_decision_points(fn_node, language, &source_code);
+        tracing::info!("{}:{fn_name} - {cc}", path.to_str().unwrap_or(""));
     });
 }
 
-fn cyclomatic_complexity(node: &Node, language: Language, source_code: &str) -> usize {
+fn count_decision_points(node: &Node, language: Language, source_code: &str) -> usize {
     let mut decision_points = 1;
 
     decision_points += get_ifs(node, language, source_code)
